@@ -1,11 +1,13 @@
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import https from 'https';
 import { fileURLToPath } from 'url';
 
-// Setup __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+// TLS certificate paths (PEM format)
+const CERT_FILE = "/etc/letsencrypt/live/intelligence.itwithlyam.co.uk/fullchain.pem"
+const KEY_FILE = "/etc/letsencrypt/live/intelligence.itwithlyam.co.uk/privkey.pem";
 
 const BOXES_FILE = path.join(__dirname, 'matchboxes.json');
 const INITIAL_BEADS = 3;
@@ -48,7 +50,7 @@ function weightedChoice(moves, beads) {
     if (r < beads[idx]) return idx;
     r -= beads[idx];
   }
-  return moves[0]; // fallback
+  return moves[0];
 }
 
 app.post('/evaluate', async (req, res) => {
@@ -58,24 +60,16 @@ app.post('/evaluate', async (req, res) => {
 
   const stateKey = keyFromBoard(board);
   if (!matchboxes[stateKey]) {
-    matchboxes[stateKey] = {
-      beads: board.map((c, i) => c === null ? INITIAL_BEADS : 0)
-    };
+    matchboxes[stateKey] = { beads: board.map(c => c === null ? INITIAL_BEADS : 0) };
     await saveBoxes();
   }
 
   const box = matchboxes[stateKey];
-  const moves = board
-    .map((c, i) => c === null && box.beads[i] > 0 ? i : null)
-    .filter(i => i !== null);
-
-  if (moves.length === 0) {
-    moves.push(...board.map((c, i) => c === null ? i : null).filter(i => i !== null));
-  }
+  let moves = board.map((c,i) => c===null && box.beads[i]>0 ? i : null).filter(i=>i!==null);
+  if (moves.length===0) moves = board.map((c,i)=>c===null?i:null).filter(i=>i!==null);
 
   const choice = weightedChoice(moves, box.beads);
-
-  if (!gameHistories[gameId]) gameHistories[gameId] = [];
+  gameHistories[gameId] = gameHistories[gameId]||[];
   gameHistories[gameId].push({ stateKey, move: choice });
 
   res.json({ move: choice, gameId });
@@ -83,22 +77,16 @@ app.post('/evaluate', async (req, res) => {
 
 app.post('/gameover', async (req, res) => {
   const { gameId, result } = req.body;
-  const history = gameHistories[gameId] || [];
+  const history = gameHistories[gameId]||[];
   delete gameHistories[gameId];
 
   for (const { stateKey, move } of history) {
     const box = matchboxes[stateKey];
     if (!box) continue;
-
-    if (result === 'menace_win') {
-      box.beads[move] += WIN_REWARD;
-    } else if (result === 'draw') {
-      box.beads[move] += DRAW_REWARD;
-    } else if (result === 'menace_loss') {
-      box.beads[move] = Math.max(1, box.beads[move] - LOSS_PENALTY);
-    }
+    if (result==='menace_win') box.beads[move]+=WIN_REWARD;
+    else if (result==='draw') box.beads[move]+=DRAW_REWARD;
+    else if (result==='menace_loss') box.beads[move]=Math.max(1, box.beads[move]-LOSS_PENALTY);
   }
-
   await saveBoxes();
   res.send(`Reinforced ${history.length} moves for game ${gameId}`);
 });
@@ -106,34 +94,33 @@ app.post('/gameover', async (req, res) => {
 app.post('/probabilities', async (req, res) => {
   const { board } = req.body;
   const stateKey = keyFromBoard(board);
-
-  // create fresh box if unseen
   if (!matchboxes[stateKey]) {
-    matchboxes[stateKey] = {
-      beads: board.map(c => c === null ? INITIAL_BEADS : 0)
-    };
+    matchboxes[stateKey] = { beads: board.map(c=>c===null?INITIAL_BEADS:0) };
     await saveBoxes();
   }
-
   let beads = matchboxes[stateKey].beads;
-
-  // compute initial probabilities
   const computeProbs = bs => {
-    const total = bs.reduce((s, b) => s + b, 0) || 1;
-    return bs.map(b => +(b / total).toFixed(2));
+    const tot = bs.reduce((s,b)=>s+b,0)||1;
+    return bs.map(b=>+(b/tot).toFixed(2));
   };
   let probabilities = computeProbs(beads);
-
-  // if any bead is 0 AND any probability < 0.6, bump all beads by 1
-  if (beads.some(b => b === 0) && probabilities.some(p => p < 0.6)) {
-    beads = beads.map(b => b + 0);
-    matchboxes[stateKey].beads = beads;
+  if (beads.some(b=>b===0) && probabilities.some(p=>p<0.6)) {
+    beads = beads.map(b=>b+1);
+    matchboxes[stateKey].beads=beads;
     await saveBoxes();
-    probabilities = computeProbs(beads);
+    probabilities=computeProbs(beads);
   }
-
   res.json({ beads, probabilities });
 });
 
-const PORT = 1231;
-app.listen(PORT, () => console.log(`MENACE server listening on port ${PORT}`));
+// Read TLS credentials and start HTTPS server
+try {
+  const [key, cert] = await Promise.all([
+    fs.readFile(KEY_FILE),
+    fs.readFile(CERT_FILE)
+  ]);
+  https.createServer({ key, cert }, app).listen(443, () => console.log('HTTPS server listening on port 443'));
+} catch (err) {
+  console.error('Failed to start HTTPS server:', err);
+  process.exit(1);
+}
