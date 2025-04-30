@@ -39,7 +39,6 @@ const TicTacToe = () => {
   const handleClick = async (i) => {
     if (!isPlayerTurn || board[i] !== null) return;
 
-    // 1) Player moves
     const newBoard = [...board];
     newBoard[i] = 'X';
     setBoard(newBoard);
@@ -50,7 +49,6 @@ const TicTacToe = () => {
     if (winner) return endGame(winner);
 
     try {
-      // 2) Fetch MENACE probabilities for the state it will play on
       const pRes = await fetch(`${SERVER_URL}/probabilities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,7 +57,6 @@ const TicTacToe = () => {
       const pData = await pRes.json();
       setPrevProbabilities(pData.probabilities);
 
-      // 3) Ask MENACE to pick its move
       const evalRes = await fetch(`${SERVER_URL}/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +65,6 @@ const TicTacToe = () => {
       const data = await evalRes.json();
       setGameId(data.gameId);
 
-      // 4) Apply MENACE move
       const updated = [...newBoard];
       updated[data.move] = 'O';
       setHighlightIndex(data.move);
@@ -103,7 +99,7 @@ const TicTacToe = () => {
       console.error('Error posting game result:', e);
     }
 
-    setTimeout(resetGame, 2000);
+    setTimeout(resetGame, 100);
   };
 
   const resetGame = () => {
@@ -116,10 +112,10 @@ const TicTacToe = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex">
+    <div className="min-h-screen bg-gray-900 text-white flex gap-1">
       {/* Left: board */}
       <div className="w-2/3 flex flex-col items-center justify-center">
-        <h1 className="text-3xl mb-4">Tic Tac Toe vs MENACE</h1>
+        <h1 className="text-3xl mb-4">Naughts and Crosses</h1>
         <div className="grid grid-cols-3 gap-1">
           {board.map((val, idx) => (
             <Square
@@ -139,8 +135,8 @@ const TicTacToe = () => {
         </button>
       </div>
 
-      {/* Right: sidebar */}
-      <div className="w-1/3 p-4">
+      {/* Right: sidebar centered vertically */}
+      <div className=" self-center">
         <ProbabilitySidebar probabilities={prevProbabilities} />
       </div>
     </div>
