@@ -1,16 +1,15 @@
-// src/ProbabilitySidebar.jsx
 import React from 'react';
 
-export default function ProbabilitySidebar({ probabilities }) {
-  const labels = [
-    'Top-Left', 'Top-Mid', 'Top-Right',
-    'Mid-Left', 'Center',  'Mid-Right',
-    'Bot-Left', 'Bot-Mid',   'Bot-Right'
-  ];
+const labels = [
+  'Top-Left', 'Top-Mid', 'Top-Right',
+  'Mid-Left','Center','Mid-Right',
+  'Bot-Left','Bot-Mid','Bot-Right'
+];
 
+export default function ProbabilitySidebar({ probabilities }) {
   return (
-    <div className="w-48 bg-gray-800 p-4 text-sm rounded-lg ml-4">
-      <h2 className="text-lg mb-2">Move Probabilities</h2>
+    <div className="w-full bg-gray-800 p-4 text-sm rounded-lg">
+      <h2 className="text-lg mb-2">Last MENACE Probabilities</h2>
       <ul className="space-y-1">
         {probabilities.map((p, i) => (
           <li key={i} className="flex justify-between">

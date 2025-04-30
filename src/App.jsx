@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import ProbabilitySidebar from './ProbabilitySidebar.jsx';
+import ProbabilitySidebar from './ProbabilitySidebar';
 
-const SERVER_URL = 'http://162.19.154.182:1231'; // Change this to your MENACE server address
+const SERVER_URL = 'http://162.19.154.182:1231';
 const emptyBoard = Array(9).fill(null);
 
 const Square = ({ value, onClick, highlight }) => (
@@ -23,39 +23,23 @@ const TicTacToe = () => {
   const [highlightIndex, setHighlightIndex] = useState(null);
   const [gameId, setGameId] = useState(uuidv4());
   const [status, setStatus] = useState('Your turn (X)');
-  const [probabilities, setProbabilities] = useState(Array(9).fill(0));
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`${SERVER_URL}/probabilities`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ board }),
-        });
-        const data = await res.json();
-        setProbabilities(data.probabilities);
-      } catch (e) {
-        console.error('Could not load probabilities:', e);
-      }
-    })();
-  }, [board]);
+  const [prevProbabilities, setPrevProbabilities] = useState(Array(9).fill(0));
 
   const checkWinner = (b) => {
     const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6],
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6],
     ];
-    for (let [a, b1, c] of lines) {
+    for (let [a, b1, c] of lines)
       if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
-    }
-    return b.every(cell => cell !== null) ? 'draw' : null;
+    return b.every(cell => cell!==null) ? 'draw' : null;
   };
 
   const handleClick = async (i) => {
     if (!isPlayerTurn || board[i] !== null) return;
 
+    // 1) Player moves
     const newBoard = [...board];
     newBoard[i] = 'X';
     setBoard(newBoard);
@@ -66,94 +50,99 @@ const TicTacToe = () => {
     if (winner) return endGame(winner);
 
     try {
-      const response = await fetch(`${SERVER_URL}/evaluate`, {
+      // 2) Fetch MENACE probabilities for the state it will play on
+      const pRes = await fetch(`${SERVER_URL}/probabilities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board: newBoard }),
+      });
+      const pData = await pRes.json();
+      setPrevProbabilities(pData.probabilities);
+
+      // 3) Ask MENACE to pick its move
+      const evalRes = await fetch(`${SERVER_URL}/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldState: board, newMove: i, gameId }),
       });
-      console.log('Server /evaluate response object:', response);
-      const data = await response.json();
-      console.log('Server /evaluate JSON data:', data);
-      const move = data.move;
+      const data = await evalRes.json();
       setGameId(data.gameId);
 
-      const updatedBoard = [...newBoard];
-      updatedBoard[move] = 'O';
-      setHighlightIndex(move);
+      // 4) Apply MENACE move
+      const updated = [...newBoard];
+      updated[data.move] = 'O';
+      setHighlightIndex(data.move);
       setTimeout(() => setHighlightIndex(null), 1000);
-      setBoard(updatedBoard);
+      setBoard(updated);
 
-      const win = checkWinner(updatedBoard);
+      const win = checkWinner(updated);
       if (win) return endGame(win);
 
       setIsPlayerTurn(true);
     } catch (error) {
-      console.error('Error communicating with MENACE server during evaluate:', error);
-      setStatus('Error with server. Check console.');
+      console.error('Error during MENACE turn:', error);
+      setStatus('Server error – check console');
     }
   };
 
   const endGame = async (result) => {
-    let msg = '';
-    if (result === 'X') msg = 'You win!';
-    else if (result === 'O') msg = 'MENACE wins!';
-    else msg = "It's a draw!";
+    let msg = result==='X'? 'You win!' : result==='O'? 'MENACE wins!' : "It's a draw!";
     setStatus(msg);
     setIsPlayerTurn(false);
-  
-    // Send game outcome for reinforcement regardless of result
+
     try {
-      const response = await fetch(`${SERVER_URL}/gameover`, {
+      await fetch(`${SERVER_URL}/gameover`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gameId,
-          result: result === 'X' ? 'menace_loss' : result === 'O' ? 'menace_win' : 'draw'
+          result: result==='X'? 'menace_loss' : result==='O'? 'menace_win' : 'draw'
         }),
       });
-      console.log('Server /gameover response object:', response);
-      const text = await response.text();
-      console.log('Server /gameover response text:', text);
     } catch (e) {
-      console.error('Error posting game result to MENACE server:', e);
+      console.error('Error posting game result:', e);
     }
 
-    setTimeout(resetGame, 100)
+    setTimeout(resetGame, 2000);
   };
-  
 
   const resetGame = () => {
-    console.clear();
     setBoard([...emptyBoard]);
     setGameId(uuidv4());
     setIsPlayerTurn(true);
     setHighlightIndex(null);
     setStatus('Your turn (X)');
-    console.log('Game reset. New gameId:', gameId);
+    setPrevProbabilities(Array(9).fill(0));
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center">
-      <h1 className="text-3xl mb-4">Tic Tac Toe vs MENACE</h1>
-      <div className="grid grid-cols-3 gap-1">
-        {board.map((val, idx) => (
-          <Square
-            key={idx}
-            value={val}
-            onClick={() => handleClick(idx)}
-            highlight={highlightIndex === idx}
-          />
-        ))}
+    <div className="min-h-screen bg-gray-900 text-white flex">
+      {/* Left: board */}
+      <div className="w-2/3 flex flex-col items-center justify-center">
+        <h1 className="text-3xl mb-4">Tic Tac Toe vs MENACE</h1>
+        <div className="grid grid-cols-3 gap-1">
+          {board.map((val, idx) => (
+            <Square
+              key={idx}
+              value={val}
+              onClick={() => handleClick(idx)}
+              highlight={highlightIndex===idx}
+            />
+          ))}
+        </div>
+        <p className="mt-4 text-xl">{status}</p>
+        <button
+          onClick={resetGame}
+          className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-500"
+        >
+          Reset Game
+        </button>
       </div>
-      <p className="mt-4 text-xl">{status}</p>
-      <button
-        onClick={resetGame}
-        className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-500"
-      >
-        Reset Game
-      </button>
 
-      <ProbabilitySidebar probabilities={probabilities} />
+      {/* Right: sidebar */}
+      <div className="w-1/3 p-4">
+        <ProbabilitySidebar probabilities={prevProbabilities} />
+      </div>
     </div>
   );
 };

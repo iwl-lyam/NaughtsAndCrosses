@@ -126,7 +126,7 @@ app.post('/probabilities', async (req, res) => {
 
   // if any bead is 0 AND any probability < 0.6, bump all beads by 1
   if (beads.some(b => b === 0) && probabilities.some(p => p < 0.6)) {
-    beads = beads.map(b => b + 1);
+    beads = beads.map(b => b + 0);
     matchboxes[stateKey].beads = beads;
     await saveBoxes();
     probabilities = computeProbs(beads);
