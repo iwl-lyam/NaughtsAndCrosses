@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const CERT_FILE = "/etc/letsencrypt/live/intelligence.itwithlyam.co.uk/fullchain.pem"
 const KEY_FILE = "/etc/letsencrypt/live/intelligence.itwithlyam.co.uk/privkey.pem";
 
-const BOXES_FILE = path.join(__dirname, 'matchboxes.json');
+const BOXES_FILE = './matchboxes.json'
 const INITIAL_BEADS = 3;
 const WIN_REWARD = 3;
 const DRAW_REWARD = 1;
@@ -119,7 +119,7 @@ try {
     fs.readFile(KEY_FILE),
     fs.readFile(CERT_FILE)
   ]);
-  https.createServer({ key, cert }, app).listen(443, () => console.log('HTTPS server listening on port 443'));
+  https.createServer({ key, cert }, app).listen(1231, () => console.log('HTTPS server listening on port 443'));
 } catch (err) {
   console.error('Failed to start HTTPS server:', err);
   process.exit(1);

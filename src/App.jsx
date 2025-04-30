@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import ProbabilitySidebar from './ProbabilitySidebar';
 
-const SERVER_URL = 'http://162.19.154.182:1231';
+const SERVER_URL = 'https://intelligence.itwithlyam.co.uk:1231';
 const emptyBoard = Array(9).fill(null);
 
 const Square = ({ value, onClick, highlight }) => (
