@@ -125,5 +125,5 @@ app.post('/probabilities', async (req, res) => {
   });
   
 
-const PORT = 3000;
+const PORT = 1231;
 app.listen(PORT, () => console.log(`MENACE server listening on port ${PORT}`));

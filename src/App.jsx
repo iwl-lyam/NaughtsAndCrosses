@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import ProbabilitySidebar from './ProbabilitySidebar.jsx';
 
 const SERVER_URL = 'http://162.19.154.182:1231'; // Change this to your MENACE server address
 const emptyBoard = Array(9).fill(null);
@@ -22,6 +23,23 @@ const TicTacToe = () => {
   const [highlightIndex, setHighlightIndex] = useState(null);
   const [gameId, setGameId] = useState(uuidv4());
   const [status, setStatus] = useState('Your turn (X)');
+  const [probabilities, setProbabilities] = useState(Array(9).fill(0));
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${SERVER_URL}/probabilities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board }),
+        });
+        const data = await res.json();
+        setProbabilities(data.probabilities);
+      } catch (e) {
+        console.error('Could not load probabilities:', e);
+      }
+    })();
+  }, [board]);
 
   const checkWinner = (b) => {
     const lines = [
@@ -134,6 +152,8 @@ const TicTacToe = () => {
       >
         Reset Game
       </button>
+
+      <ProbabilitySidebar probabilities={probabilities} />
     </div>
   );
 };
