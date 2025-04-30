@@ -103,5 +103,27 @@ app.post('/gameover', async (req, res) => {
   res.send(`Reinforced ${history.length} moves for game ${gameId}`);
 });
 
+// POST /probabilities
+// { board: Array<null|'X'|'O'> }
+// → { beads: number[9], probabilities: number[9] }
+app.post('/probabilities', async (req, res) => {
+    const { board } = req.body;
+    const stateKey = keyFromBoard(board);
+  
+    // if we’ve never seen this position, create a fresh box
+    if (!matchboxes[stateKey]) {
+      matchboxes[stateKey] = {
+        beads: board.map(c => c === null ? INITIAL_BEADS : 0)
+      };
+      await saveBoxes();
+    }
+  
+    const beads = matchboxes[stateKey].beads;
+    const total = beads.reduce((sum, b) => sum + b, 0) || 1;
+    const probabilities = beads.map(b => +(b / total).toFixed(2));
+    res.json({ beads, probabilities });
+  });
+  
+
 const PORT = 3000;
 app.listen(PORT, () => console.log(`MENACE server listening on port ${PORT}`));
