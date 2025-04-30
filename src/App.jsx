@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-const SERVER_URL = 'http://localhost:3000'; // Change this to your MENACE server address
+const SERVER_URL = 'http://162.19.154.182:1231'; // Change this to your MENACE server address
 const emptyBoard = Array(9).fill(null);
 
 const Square = ({ value, onClick, highlight }) => (
